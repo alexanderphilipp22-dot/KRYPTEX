@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ system splash: black, showing the launcher icon (the vault door on black), so it
+         hands over seamlessly to the in-app splash. The icon is left to the system default rather
+         than overridden, which some vendor starting-window implementations handle less reliably. -->
+    <style name="Theme.Kryptex" parent="Base.Theme.Kryptex">
+        <item name="android:windowSplashScreenBackground">@android:color/black</item>
+    </style>
+</resources>

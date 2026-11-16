@@ -1,0 +1,33 @@
+# Gradle / build output
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local machine configuration
+local.properties
+*.iml
+.idea/
+.kotlin/
+.cxx/
+captures/
+
+# Signing material - never commit
+*.jks
+*.keystore
+keystore.properties
+
+# Local logs and editor settings (contain machine-specific paths)
+*.log
+build_log.txt
+.vscode/
+
+# Local environment and secrets
+.env
+.env.*
+*.pem
+*.p12
+google-services.json
+
+# OS noise
+.DS_Store
+Thumbs.db

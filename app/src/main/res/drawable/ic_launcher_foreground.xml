@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Brushed-metal vault door inside the adaptive-icon area (door radius 31, bolt tips within 36).
+     Same geometry as the in-app KryptexLogo; light falls from the top left. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Locking bolts on the opening side: shadow, then metal. -->
+    <path
+        android:pathData="M34.70,35.00L30.88,31.18M54.50,26.80L54.50,21.40M74.30,35.00L78.12,31.18M82.50,54.80L87.90,54.80M74.30,74.60L78.12,78.42M54.50,82.80L54.50,88.20M34.70,74.60L30.88,78.42"
+        android:strokeWidth="2.8"
+        android:strokeColor="#FF2A2A2D"
+        android:strokeAlpha="0.6"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M34.20,34.20L30.38,30.38M54,26L54,20.6M73.80,34.20L77.62,30.38M82,54L87.4,54M73.80,73.80L77.62,77.62M54,82L54,87.4M34.20,73.80L30.38,77.62"
+        android:strokeWidth="2.6"
+        android:strokeColor="#FFB4B4BA"
+        android:strokeLineCap="round" />
+
+    <!-- Hinges. -->
+    <path android:pathData="M20.5,41h2.5a1,1 0,0 1,1 1v4a1,1 0,0 1,-1 1h-2.5a1,1 0,0 1,-1 -1v-4a1,1 0,0 1,1 -1z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="0" android:startY="41" android:endX="0" android:endY="47">
+                <item android:offset="0" android:color="#FFB4B4BA" />
+                <item android:offset="0.5" android:color="#FF6E6E73" />
+                <item android:offset="1" android:color="#FF2A2A2D" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M20.5,61h2.5a1,1 0,0 1,1 1v4a1,1 0,0 1,-1 1h-2.5a1,1 0,0 1,-1 -1v-4a1,1 0,0 1,1 -1z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="0" android:startY="61" android:endX="0" android:endY="67">
+                <item android:offset="0" android:color="#FFB4B4BA" />
+                <item android:offset="0.5" android:color="#FF6E6E73" />
+                <item android:offset="1" android:color="#FF2A2A2D" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Bezel ring. -->
+    <path
+        android:fillType="evenOdd"
+        android:pathData="M23,54a31,31 0,1 0,62 0a31,31 0,1 0,-62 0zM29,54a25,25 0,1 0,50 0a25,25 0,1 0,-50 0z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="25" android:startY="25" android:endX="83" android:endY="83">
+                <item android:offset="0" android:color="#FFF2F2F7" />
+                <item android:offset="0.45" android:color="#FF8E8E93" />
+                <item android:offset="1" android:color="#FF3A3A3C" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M23,54a31,31 0,1 0,62 0a31,31 0,1 0,-62 0z"
+        android:strokeWidth="0.6"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeAlpha="0.22" />
+
+    <!-- Door face. -->
+    <path android:pathData="M29.4,54a24.6,24.6 0,1 0,49.2 0a24.6,24.6 0,1 0,-49.2 0z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="48" android:centerY="46" android:gradientRadius="32">
+                <item android:offset="0" android:color="#FF2C2C2E" />
+                <item android:offset="0.55" android:color="#FF161618" />
+                <item android:offset="1" android:color="#FF0B0B0C" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M29,54a25,25 0,1 0,50 0a25,25 0,1 0,-50 0z"
+        android:strokeWidth="0.9"
+        android:strokeColor="#FF000000"
+        android:strokeAlpha="0.7" />
+
+    <!-- Handle wheel: spoke shadows, spokes, spoke highlights. -->
+    <path
+        android:pathData="M54.5,50.2L54.5,39.8M58.48,57.1L67.49,62.3M50.52,57.1L41.51,62.3"
+        android:strokeWidth="3"
+        android:strokeColor="#FF000000"
+        android:strokeAlpha="0.55"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M54,49.4L54,39M57.98,56.3L66.99,61.5M50.02,56.3L41.01,61.5"
+        android:strokeWidth="2.5"
+        android:strokeColor="#FFC7C7CC"
+        android:strokeLineCap="round" />
+
+    <!-- Knobs: shadow, body, highlight. -->
+    <path
+        android:fillColor="#FF000000"
+        android:fillAlpha="0.55"
+        android:pathData="M51.6,38.4a2.9,2.9 0,1 0,5.8 0a2.9,2.9 0,1 0,-5.8 0zM65.8,63a2.9,2.9 0,1 0,5.8 0a2.9,2.9 0,1 0,-5.8 0zM37.4,63a2.9,2.9 0,1 0,5.8 0a2.9,2.9 0,1 0,-5.8 0z" />
+    <path
+        android:fillColor="#FF6E6E73"
+        android:pathData="M51.3,37.6a2.7,2.7 0,1 0,5.4 0a2.7,2.7 0,1 0,-5.4 0zM65.5,62.2a2.7,2.7 0,1 0,5.4 0a2.7,2.7 0,1 0,-5.4 0zM37.1,62.2a2.7,2.7 0,1 0,5.4 0a2.7,2.7 0,1 0,-5.4 0z" />
+    <path
+        android:fillColor="#FFB4B4BA"
+        android:pathData="M51.6,37a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0zM65.8,61.6a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0zM37.4,61.6a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0z" />
+
+    <!-- Hub: shadow, metal, cap, glint. -->
+    <path
+        android:fillColor="#FF000000"
+        android:fillAlpha="0.55"
+        android:pathData="M48.4,54.8a6.1,6.1 0,1 0,12.2 0a6.1,6.1 0,1 0,-12.2 0z" />
+    <path android:pathData="M48.4,54a5.6,5.6 0,1 0,11.2 0a5.6,5.6 0,1 0,-11.2 0z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="52.4" android:centerY="52.2" android:gradientRadius="6.4">
+                <item android:offset="0" android:color="#FFF2F2F7" />
+                <item android:offset="0.35" android:color="#FFB4B4BA" />
+                <item android:offset="0.75" android:color="#FF6E6E73" />
+                <item android:offset="1" android:color="#FF2A2A2D" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:fillColor="#FF0B0B0C"
+        android:pathData="M52,54a2,2 0,1 0,4 0a2,2 0,1 0,-4 0z" />
+
+    <!-- Specular sweep on the bezel. -->
+    <path
+        android:pathData="M26.185,43.877A29.6,29.6 0,0 1,48.86 24.85"
+        android:strokeWidth="1.1"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeAlpha="0.16"
+        android:strokeLineCap="round" />
+</vector>

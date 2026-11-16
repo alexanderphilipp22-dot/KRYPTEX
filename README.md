@@ -35,20 +35,40 @@ analytics.
 - **Encrypted database:** item metadata lives in Room on SQLCipher.
 - **Gesture unlock (optional):** a secret sequence of blinks, winks, glances, eyebrow raises, mouth
   and smile gestures, recognised on-device with MediaPipe Face Landmarker. The camera starts only
-  when you tap the button, and no image is stored. Five wrong attempts switch it off until the
-  passphrase is used.
+  when you tap the button, and no image is stored. A short vibration confirms each recognised
+  gesture (optional, on by default). Five wrong attempts switch it off until the passphrase is used.
+- **Face check (optional, on by default):** when gestures are set up, ten proportions of your face
+  (ratios between the eye corners and points on the nose) are measured and saved. At unlock the
+  face in front of the camera must fit them, so someone who has watched and copied your sequence
+  is turned away. A face that does not fit looks exactly like a wrong sequence and uses up one of
+  the five attempts. It can be switched off in Settings.
 - **Memory hygiene:** keys and decrypted content are wiped when the vault locks, which happens as
   soon as the app leaves the foreground.
 - **Languages:** English, Deutsch, Русский.
 
 ### Security notes
 
-- A gesture sequence is a secret you *perform*, not a biometric check. Anyone who watches you can
-  learn it, and it is weaker than a good passphrase. The passphrase always works.
+- A gesture sequence is a secret you *perform*. Anyone who watches you can learn it, and it is
+  weaker than a good passphrase. The passphrase always works.
+- **The face check is rough, and it is not a fingerprint-grade biometric.** Ten ratios from a
+  landmark model tell clearly different faces apart, but look-alikes and relatives may pass, a
+  photo or screen held to the camera is not detected (there is no liveness check), and poor light,
+  a different distance or an unusual angle may turn the owner away. It is a gate in the app, not
+  part of the key: the key still comes from the gesture sequence alone, so the check adds no
+  cryptographic strength. Its thresholds are provisional and need tuning on real devices.
+- **What is stored for the face check:** the ten numbers, never a picture. They are sealed together
+  with the vault key inside the gesture key slot (Argon2id from the sequence plus the Android
+  Keystore), so they can be read only with the right sequence on this phone, they are compared
+  before the vault key is released, and they are wiped from memory afterwards. They never leave the
+  device. Turning the check off in Settings stops the comparison but does not delete them; setting
+  gestures up again replaces them, and removing gestures deletes them. Gestures set up with a
+  version before the face check have none and are not checked until set up again. The only extra
+  state outside the vault is one on/off flag in plain local preferences.
 - A picture that carries a hidden item loses it if it is edited, cropped, compressed or re-sent
   through a messenger. Keep the saved PNG exactly as it is.
 - The merged manifest is checked at build time: the build fails if any permission other than
-  `CAMERA` appears.
+  `CAMERA` (gesture unlock) and `VIBRATE` (the short pulse when a gesture is recognised, which can
+  be switched off in Settings) appears. There is no network permission.
 
 ## Building
 

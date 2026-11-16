@@ -1,6 +1,7 @@
 package com.kryptex.vault.vision
 
 import kotlin.math.max
+import kotlin.math.sqrt
 
 /**
  * One analysed camera frame, reduced to the few numbers the gesture logic needs. Everything
@@ -26,6 +27,11 @@ data class FaceFrame(
     val headYaw: Float = 0f,
     /** Head pitch proxy; 0 = frontal, positive = tilted up. */
     val headPitch: Float = 0f,
+    /**
+     * This frame's face proportions (see [FaceDescriptor]); null if the mesh was too small or
+     * collapsed to measure. Only used for the optional face check, never shown or logged.
+     */
+    val geometry: FaceDescriptor? = null,
 ) {
     companion object {
         fun noFace(timestampMs: Long) = FaceFrame(timestampMs, faceDetected = false)
@@ -33,20 +39,32 @@ data class FaceFrame(
 }
 
 /**
- * Landmark coordinates of one face in *isotropic* units: a unit is the same distance along both
- * axes, so projections onto slanted axes are meaningful. MediaPipe normalises x by the image width
- * and y by the image height; [fromNormalized] undoes that.
+ * Landmark coordinates of one face in *isotropic* units: a unit is the same distance along all
+ * axes, so projections onto slanted axes and distances between points are meaningful. MediaPipe
+ * normalises x by the image width and y by the image height; [fromNormalized] undoes that.
  *
  * The frame may have any orientation and may be mirrored. MediaPipe reports landmarks in the
  * unrotated camera buffer, which for a front camera held upright is usually turned by 90 or 270
- * degrees; [GazeEstimator] only measures along the face's own axes, so that does not matter.
+ * degrees; [GazeEstimator] only measures along the face's own axes and [FaceGeometry] only
+ * measures distances, so that does not matter.
+ *
+ * [z] is MediaPipe's relative depth (smaller = nearer the camera). It is a model estimate, less
+ * exact than x and y, which is why only [FaceGeometry] uses it and [GazeEstimator] does not.
  */
-class FaceLandmarks(val x: FloatArray, val y: FloatArray) {
+class FaceLandmarks(val x: FloatArray, val y: FloatArray, val z: FloatArray = FloatArray(x.size)) {
     init {
-        require(x.size == y.size) { "x/y size mismatch" }
+        require(x.size == y.size && x.size == z.size) { "x/y/z size mismatch" }
     }
 
     val count: Int get() = x.size
+
+    /** Straight-line distance between landmarks [a] and [b], in the same isotropic units. */
+    fun distance(a: Int, b: Int): Float {
+        val dx = x[a] - x[b]
+        val dy = y[a] - y[b]
+        val dz = z[a] - z[b]
+        return sqrt(dx * dx + dy * dy + dz * dz)
+    }
 
     /**
      * Where landmark [p] lies along the axis from landmark [from] to landmark [to]: 0 at [from],
@@ -66,10 +84,12 @@ class FaceLandmarks(val x: FloatArray, val y: FloatArray) {
          * @param x landmark x normalised by the image width, as MediaPipe reports it
          * @param y landmark y normalised by the image height
          * @param aspect width / height of the image the landmarks were measured in
+         * @param z landmark depth; MediaPipe gives it "roughly the same scale as x", so it is
+         *   scaled the same way. Omitted = flat (all zero).
          */
-        fun fromNormalized(x: FloatArray, y: FloatArray, aspect: Float): FaceLandmarks {
+        fun fromNormalized(x: FloatArray, y: FloatArray, aspect: Float, z: FloatArray = FloatArray(x.size)): FaceLandmarks {
             require(aspect > 0f && aspect.isFinite()) { "invalid aspect ratio $aspect" }
-            return FaceLandmarks(FloatArray(x.size) { x[it] * aspect }, y)
+            return FaceLandmarks(FloatArray(x.size) { x[it] * aspect }, y, FloatArray(z.size) { z[it] * aspect })
         }
     }
 }
@@ -95,8 +115,15 @@ object FaceMesh {
     const val RIGHT_IRIS_CENTER = 468
     const val LEFT_IRIS_CENTER = 473
 
+    /** Nose, from the root between the eyes down to the nostril wings (all part of MediaPipe's FACEMESH_NOSE). */
+    const val NOSE_BRIDGE = 168
+    const val SUBNASALE = 2
+    const val NOSTRIL_RIGHT = 98
+    const val NOSTRIL_LEFT = 327
+
     const val MIN_LANDMARKS_FOR_HEAD = CHEEK_LEFT + 1
     const val MIN_LANDMARKS_FOR_IRIS = LEFT_IRIS_CENTER + 1
+    const val MIN_LANDMARKS_FOR_GEOMETRY = NOSTRIL_LEFT + 1
 }
 
 object FaceFeatureExtractor {
@@ -135,6 +162,7 @@ object FaceFeatureExtractor {
             smile = smile,
             headYaw = head?.yaw ?: 0f,
             headPitch = head?.pitch ?: 0f,
+            geometry = FaceGeometry.measure(landmarks),
         )
     }
 }

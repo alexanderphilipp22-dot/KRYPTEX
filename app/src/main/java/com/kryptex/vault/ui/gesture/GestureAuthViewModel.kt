@@ -13,8 +13,11 @@ import com.kryptex.vault.data.db.VaultOpenException
 import com.kryptex.vault.data.db.entity.AuthEventType
 import com.kryptex.vault.data.repo.VaultRepository
 import com.kryptex.vault.di.AppContainer
+import com.kryptex.vault.vision.FaceDescriptor
+import com.kryptex.vault.vision.FaceGeometry
 import com.kryptex.vault.vision.FailureReason
 import com.kryptex.vault.vision.Gesture
+import com.kryptex.vault.vision.GestureProgressTracker
 import com.kryptex.vault.vision.GestureSequence
 import com.kryptex.vault.vision.GlanceEngine
 import com.kryptex.vault.vision.GlanceState
@@ -68,6 +71,12 @@ sealed interface GestureMessage {
     /** A wrong unlock attempt. [attemptsLeft] is null when the limiter reports no count. */
     data class Wrong(val attemptsLeft: Int?) : GestureMessage
 
+    /**
+     * Enrolment: the sequence matched but the two passes did not show one clearly readable face
+     * (or one could not be read at all), so no face template was saved.
+     */
+    data object FaceInconsistent : GestureMessage
+
     data class Failure(val reason: FailureReason) : GestureMessage
 }
 
@@ -101,7 +110,11 @@ class GestureAuthViewModel(
     private val stage = MutableStateFlow(if (mode == GestureMode.UNLOCK) GestureStage.UNLOCK_READY else GestureStage.CHOOSE_LENGTH)
     private val steps = MutableStateFlow(initialSteps())
     private val message = MutableStateFlow<GestureMessage?>(null)
-    private var firstPass: GestureSequence? = null
+
+    // Enrolment: the first pass, and the face proportions seen during it. Both are secrets-in-waiting
+    // and are dropped (and the face wiped) as soon as they are used up or the attempt is abandoned.
+    @Volatile private var firstPass: GestureSequence? = null
+    @Volatile private var firstFace: FaceDescriptor? = null
 
     private val eventChannel = Channel<GestureEvent>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
@@ -115,13 +128,18 @@ class GestureAuthViewModel(
             GestureUiState(mode, stage.value, steps.value, GlanceState.Idle, null),
         )
 
+    private val progress = GestureProgressTracker()
+
     init {
         viewModelScope.launch {
             engine.state.collect { glance ->
+                // One crisp pulse per accepted gesture, in both unlock and enrolment: it carries the
+                // count (the anonymous dots already show that) and never which gesture it was.
+                if (progress.accepted(glance)) container.haptics.gestureRecognised()
                 when (glance) {
                     is GlanceState.Completed -> {
                         engine.reset()
-                        onSequence(glance.sequence)
+                        onSequence(glance.sequence, glance.face)
                     }
                     is GlanceState.Failed -> {
                         engine.reset()
@@ -150,7 +168,7 @@ class GestureAuthViewModel(
 
     /** Enrolment: leave the length picker and get ready to record. */
     fun beginRecording() {
-        firstPass = null
+        dropFirstPass()
         message.value = null
         stage.value = GestureStage.RECORD_FIRST
     }
@@ -177,27 +195,39 @@ class GestureAuthViewModel(
 
     // ---- result handling --------------------------------------------------------------------
 
-    private fun onSequence(sequence: GestureSequence) {
+    /** @param face what the camera saw while the sequence was performed; this method owns it from here. */
+    private fun onSequence(sequence: GestureSequence, face: FaceDescriptor?) {
         when (mode) {
-            GestureMode.UNLOCK -> verifyUnlock(sequence)
+            GestureMode.UNLOCK -> verifyUnlock(sequence, face)
             GestureMode.ENROLL -> when (stage.value) {
                 GestureStage.RECORD_FIRST -> {
+                    dropFirstPass()
                     firstPass = sequence
+                    firstFace = face
                     message.value = GestureMessage.Recorded
                     stage.value = GestureStage.RECORD_CONFIRM
                 }
-                GestureStage.RECORD_CONFIRM -> confirmEnrolment(sequence)
-                else -> Unit
+                GestureStage.RECORD_CONFIRM -> confirmEnrolment(sequence, face)
+                else -> face?.wipe()
             }
         }
     }
 
-    private fun verifyUnlock(sequence: GestureSequence) {
+    /** Forgets the first enrolment pass: the sequence, and the face wiped rather than left for the garbage collector. */
+    private fun dropFirstPass() {
+        firstPass = null
+        firstFace?.wipe()
+        firstFace = null
+    }
+
+    private fun verifyUnlock(sequence: GestureSequence, face: FaceDescriptor?) {
         stage.value = GestureStage.WORKING
+        // Null when the switch is off. With it on, an unreadable face (face == null) is a mismatch.
+        val faceVerifier = container.faceCheck.verifier(face)
         viewModelScope.launch(Dispatchers.Default) {
             val secret = sequence.toSecret()
             try {
-                when (val result = container.keyManager.unlockWithGesture(secret)) {
+                when (val result = container.keyManager.unlockWithGesture(secret, faceVerifier)) {
                     is UnlockResult.Success -> {
                         try {
                             val session = container.sessionManager.open(result.dek)
@@ -207,11 +237,10 @@ class GestureAuthViewModel(
                         }
                         // On success the root gate swaps this screen out by itself.
                     }
-                    is UnlockResult.WrongCredential -> {
-                        val left = result.attemptsRemaining
-                        message.value = GestureMessage.Wrong(left)
-                        if (left == 0) fallBack(GestureFallback.TOO_MANY_ATTEMPTS) else stage.value = GestureStage.UNLOCK_READY
-                    }
+                    is UnlockResult.WrongCredential -> rejected(result.attemptsRemaining)
+                    // Deliberately the same message as a wrong sequence: it must not tell someone who
+                    // watched the sequence that it was the sequence that they got right.
+                    is UnlockResult.FaceMismatch -> rejected(result.attemptsRemaining)
                     UnlockResult.GestureLocked -> fallBack(GestureFallback.LOCKED)
                     UnlockResult.GestureUnavailable -> fallBack(GestureFallback.UNAVAILABLE)
                     UnlockResult.GestureNotEnrolled -> fallBack(GestureFallback.NOT_ENROLLED)
@@ -227,27 +256,50 @@ class GestureAuthViewModel(
                 fallBack(GestureFallback.UNREADABLE)
             } finally {
                 secret.wipe()
+                face?.wipe()
             }
         }
     }
 
-    private fun confirmEnrolment(second: GestureSequence) {
+    /** A wrong attempt of either kind: the same words, the same countdown, the same fall-back. */
+    private fun rejected(attemptsLeft: Int?) {
+        message.value = GestureMessage.Wrong(attemptsLeft)
+        if (attemptsLeft == 0) fallBack(GestureFallback.TOO_MANY_ATTEMPTS) else stage.value = GestureStage.UNLOCK_READY
+    }
+
+    private fun confirmEnrolment(second: GestureSequence, secondFace: FaceDescriptor?) {
         val first = firstPass
+        val firstReading = firstFace
         if (first == null || first != second) {
-            firstPass = null
+            dropFirstPass()
+            secondFace?.wipe()
             message.value = GestureMessage.Mismatch
             stage.value = GestureStage.RECORD_FIRST
             return
         }
+
+        // The template is the average of the two passes, but only if both were readable and show the
+        // same face. With the face check on, anything else restarts: saving no template would
+        // quietly give a weaker lock than the switch promises. With it off, the setup is not held up.
+        val template = FaceGeometry.enrolmentTemplate(firstReading, secondFace)
+        secondFace?.wipe()
+        if (template == null && container.faceCheck.enabled.value) {
+            dropFirstPass()
+            message.value = GestureMessage.FaceInconsistent
+            stage.value = GestureStage.RECORD_FIRST
+            return
+        }
+
         stage.value = GestureStage.WORKING
         viewModelScope.launch(Dispatchers.Default) {
             val secret = first.toSecret()
+            val templateBytes = template?.toBytes()
             try {
                 val session = checkNotNull(container.sessionManager.session.value) { "vault is locked" }
                 val params = container.kdfCalibrator.calibrate(container.kdfMemoryBudgetKiB())
-                session.withDek { dek -> container.keyManager.enrollGesture(dek, secret, first.size, params) }
+                session.withDek { dek -> container.keyManager.enrollGesture(dek, secret, first.size, params, templateBytes) }
                 VaultRepository(session.database).recordEvent(AuthEventType.GESTURE_ENROLLED)
-                firstPass = null
+                dropFirstPass()
                 message.value = null
                 stage.value = GestureStage.SAVED
             } catch (e: Exception) {
@@ -258,6 +310,8 @@ class GestureAuthViewModel(
                 stage.value = GestureStage.RECORD_FIRST
             } finally {
                 secret.wipe()
+                templateBytes?.wipe()
+                template?.wipe()
             }
         }
     }
@@ -269,6 +323,7 @@ class GestureAuthViewModel(
 
     override fun onCleared() {
         engine.reset() // releases the camera if the screen is left mid-capture
+        dropFirstPass()
         super.onCleared()
     }
 }

@@ -1,5 +1,6 @@
 package com.kryptex.vault.vision
 
+import kotlin.math.abs
 import kotlin.math.max
 
 enum class FailureReason {
@@ -45,6 +46,17 @@ data class DetectorConfig(
     val maxRestingBlink: Float = 0.5f,
     val maxRestingJaw: Float = 0.35f,
     val maxRestingSmile: Float = 0.6f,
+    /**
+     * Face-geometry sampling (see [GestureSequenceDetector.faceDescriptor]). Only calm frames count:
+     * head within [maxFaceSampleYaw] of straight on (the nose's offset from the middle of the
+     * cheeks), eyes open, and mouth and smile no more than [maxSampleExpression] beyond the
+     * resting face. The most recent [maxFaceSamples] are kept; fewer than [minFaceSamples] means
+     * the face was not seen well enough to be measured.
+     */
+    val minFaceSamples: Int = 10,
+    val maxFaceSamples: Int = 120,
+    val maxFaceSampleYaw: Float = 0.12f,
+    val maxSampleExpression: Float = 0.2f,
 )
 
 enum class DetectorPhase { CALIBRATING, CAPTURING, COMPLETE, FAILED }
@@ -106,8 +118,24 @@ class GestureSequenceDetector(
     private val totalTimeoutMillis = config.totalTimeoutBaseMillis + config.totalTimeoutPerStepMillis * max(0, steps - 3)
     private var lastFrame: FaceFrame? = null
 
+    // Face proportions of calm, readable frames. The detector's own copies, so wiping them never
+    // touches a frame someone else still holds.
+    private val faceSamples = ArrayDeque<FaceDescriptor>()
+
     fun sequenceOrNull(): GestureSequence? =
         if (phase == DetectorPhase.COMPLETE && committed.size == steps) GestureSequence(committed.toList()) else null
+
+    /**
+     * The face the session saw, as the per-ratio median of its calm frames: the resting face at the
+     * start, the pauses between gestures, and every other frame with no gesture in progress. The
+     * median over a whole session (not the single frame at the last gesture, which is mid
+     * expression) is steady against a twitch or a tracking glitch.
+     *
+     * Only for a completed session. Null if too few calm frames were measured; callers must not
+     * treat that as a match. The caller owns the result and wipes it.
+     */
+    fun faceDescriptor(): FaceDescriptor? =
+        if (phase == DetectorPhase.COMPLETE && faceSamples.size >= config.minFaceSamples) FaceDescriptor.median(faceSamples) else null
 
     /**
      * Forgets everything recognised so far (the sequence is the secret) and ignores later frames.
@@ -116,6 +144,8 @@ class GestureSequenceDetector(
     fun wipe() {
         committed.clear()
         calibrationFrames.clear()
+        faceSamples.forEach(FaceDescriptor::wipe)
+        faceSamples.clear()
         candidate = null
         lastFrame = null
         if (phase != DetectorPhase.COMPLETE) phase = DetectorPhase.FAILED
@@ -165,6 +195,7 @@ class GestureSequenceDetector(
         }
 
         baseline = resting
+        openEyed.forEach { sampleFace(it) }
         calibrationFrames.clear()
         phase = DetectorPhase.CAPTURING
         captureStart = ts
@@ -176,6 +207,18 @@ class GestureSequenceDetector(
     private fun restartCalibration() {
         calibrationFrames.clear()
         calibrationStart = -1L
+    }
+
+    /** Keeps this frame's face proportions if the face is calm; the oldest sample makes room when the buffer is full. */
+    private fun sampleFace(frame: FaceFrame) {
+        val geometry = frame.geometry ?: return
+        val calm = abs(frame.headYaw) <= config.maxFaceSampleYaw &&
+            (frame.blinkLeft + frame.blinkRight) / 2f <= config.maxRestingBlink &&
+            frame.jawOpen - baseline.jawOpen <= config.maxSampleExpression &&
+            frame.smile - baseline.smile <= config.maxSampleExpression
+        if (!calm) return
+        if (faceSamples.size >= config.maxFaceSamples) faceSamples.removeFirst().wipe()
+        faceSamples.addLast(geometry.copy())
     }
 
     // ---- capture ---------------------------------------------------------------------------
@@ -202,6 +245,7 @@ class GestureSequenceDetector(
                 classifier.isReliable(frame, baseline) &&
                 (last == null || classifier.isReleased(last, frame, baseline))
             if (neutral) {
+                sampleFace(frame)
                 if (neutralSince < 0) neutralSince = ts
                 if (ts - neutralSince >= config.neutralGapMillis) {
                     awaitingNeutral = false
@@ -230,6 +274,8 @@ class GestureSequenceDetector(
             ) {
                 candidate = null
             }
+            // No gesture in progress and nothing to bridge: a plain look at the face.
+            if (candidate == null && classifier.isReliable(frame, baseline)) sampleFace(frame)
         }
 
         val current = candidate

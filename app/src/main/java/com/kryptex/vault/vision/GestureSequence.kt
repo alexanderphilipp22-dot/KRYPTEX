@@ -7,6 +7,9 @@ import kotlin.math.log2
  *
  * It is a secret *performed* by the user, not a biometric template: anyone who learns the order
  * can repeat it. Length is therefore the only strength lever, see [entropyBits].
+ *
+ * The optional face check ([FaceGeometry]) is a gate on top of this, not part of the key: the key
+ * comes from the sequence alone, so the face check adds no entropy and no cryptographic strength.
  */
 class GestureSequence(val gestures: List<Gesture>) {
     init {

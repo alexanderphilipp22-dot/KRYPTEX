@@ -169,6 +169,8 @@ androidComponents {
             allowedPermissions.set(
                 listOf(
                     "android.permission.CAMERA",
+                    // Gesture-recognised vibration pulse (normal permission, no user prompt).
+                    "android.permission.VIBRATE",
                     // Added by androidx.core for non-exported dynamic receivers; app-private signature permission.
                     "${android.defaultConfig.applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
                 )

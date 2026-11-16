@@ -94,6 +94,7 @@ class FaceLandmarkerSource(
             x = FloatArray(face.size) { face[it].x() },
             y = FloatArray(face.size) { face[it].y() },
             aspect = aspect,
+            z = FloatArray(face.size) { face[it].z() },
         )
         val blendshapes: Map<String, Float> = result.faceBlendshapes()
             .map { all -> all.firstOrNull()?.associate { it.categoryName() to it.score() } ?: emptyMap() }

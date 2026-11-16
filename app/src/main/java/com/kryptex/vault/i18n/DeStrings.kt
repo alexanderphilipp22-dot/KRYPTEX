@@ -85,10 +85,10 @@ object DeStrings : AppStrings {
     override val onboardingTuning = "Dein Gerät stimmt die Schlüsselableitung auf die eigene Geschwindigkeit ab. Das dauert einige Sekunden."
     override val onboardingGestureTitle = "Schnell entsperren mit dem Gesicht"
     override val onboardingGestureBody =
-        "Entsperre, indem du eine geheime Folge aus Blinzeln, Blicken, Augenbrauen-Heben oder Lächeln ausführst, statt zu tippen. Die Kamera startet nur, wenn du die Taste tippst, und es wird nichts aufgezeichnet."
+        "Entsperre, indem du eine geheime Folge aus Blinzeln, Blicken, Augenbrauen-Heben oder Lächeln ausführst, statt zu tippen. Die Kamera startet nur, wenn du die Taste tippst, und es wird kein Bild aufgezeichnet. Einige Proportionen deines Gesichts werden verschlüsselt auf diesem Handy gespeichert, damit jemand, der deine Folge nachmacht, abgewiesen wird."
     override val onboardingConvenienceTitle = "Eine Erleichterung, kein Ersatz"
     override val onboardingConvenienceBody =
-        "Eine Gestenfolge ist ein Geheimnis, das du ausführst, keine biometrische Prüfung. Wer dir zusieht, kann sie lernen, und sie ist viel schwächer als eine Passphrase. Deine Passphrase funktioniert immer."
+        "Eine Gestenfolge ist ein Geheimnis, das du ausführst. Wer dir zusieht, kann sie lernen, und die zusätzliche Gesichtsprüfung ist nur grob: Sie weist deutlich andere Gesichter ab, keine Doppelgänger. Gesten sind viel schwächer als eine Passphrase. Deine Passphrase funktioniert immer."
     override val onboardingSetUpGestures = "Gesten-Entsperrung einrichten"
     override val onboardingNotNow = "Jetzt nicht"
     override fun onboardingCreateFailed(detail: String) = "Der Tresor konnte nicht erstellt werden: $detail"
@@ -255,6 +255,11 @@ object DeStrings : AppStrings {
     override val settingsLanguageHint = "Wird in deinem verschlüsselten Tresor gespeichert. Vor dem Entsperren folgt der Sperrbildschirm der Sprache deines Handys."
     override val settingsHelpTitle = "Hilfe-Blasen"
     override val settingsHelpBody = "Zeigt kurze Tipps in den Bereichen Verstecken, Aufdecken und Einstellungen."
+    override val settingsHapticTitle = "Gesten-Vibration"
+    override val settingsHapticBody = "Ein kurzer Impuls, sobald eine Geste deiner Folge erkannt wurde, damit du weißt, wann die nächste dran ist."
+    override val settingsFaceCheckTitle = "Gesichtsprüfung"
+    override val settingsFaceCheckBody =
+        "Die Gesten-Entsperrung vergleicht zusätzlich die Proportionen deines Gesichts mit denen, die beim Einrichten der Gesten verschlüsselt gespeichert wurden, damit jemand, der deine Folge nachmacht, abgewiesen wird. Es ist eine grobe Prüfung: Ähnlich aussehende Personen können durchkommen, und schlechtes Licht kann dich abweisen. Mit einer älteren Version eingerichtete Gesten haben kein gespeichertes Gesicht; richte sie neu ein."
     override val settingsAutoLockTitle = "Automatische Sperre"
     override val settingsAutoLockHint =
         "Der Tresor sperrt immer sofort, wenn du die App verlässt oder der Bildschirm ausgeht. Dazu kommt ein Timer für den Fall, dass du den Bildschirm nicht mehr berührst, während Kryptex geöffnet bleibt."
@@ -342,7 +347,8 @@ object DeStrings : AppStrings {
     override val gestureCameraOff = "Kamera ist aus"
     override val gestureChecking = "Prüfe ..."
     override val gestureStartCamera = "Kamera starten"
-    override val gesturePrivacyNote = "Die Kamera bleibt aus, bis du die Taste tippst, und nichts wird aufgezeichnet oder gespeichert."
+    override val gesturePrivacyNote =
+        "Die Kamera bleibt aus, bis du die Taste tippst. Es wird kein Bild aufgezeichnet oder gespeichert; nur einige Gesichtsproportionen werden gemessen, und beim Einrichten der Gesten werden sie verschlüsselt auf diesem Handy gespeichert."
     override val gestureHeadlineUnlock = "Führe deine Folge aus"
     override val gestureHeadlineSaving = "Speichere ..."
     override val gestureHeadlineRecord = "Folge aufnehmen"
@@ -392,6 +398,8 @@ object DeStrings : AppStrings {
         1 -> "Das war es nicht. Noch ein Versuch, dann schaltet sich die Gesten-Entsperrung ab."
         else -> "Das war es nicht. Noch $attemptsLeft Versuche, dann schaltet sich die Gesten-Entsperrung ab."
     }
+    override val gestureMsgFaceInconsistent =
+        "Dein Gesicht wurde nicht beide Male klar erkannt. Halte das Handy auf Augenhöhe, sorge für gutes Licht, schau in die Kamera und fang von vorn an."
     override val gestureFallbackDbOpen = "Die Tresor-Datenbank konnte nicht geöffnet werden."
     override val gestureFallbackTooManyAttempts = "Zu viele Fehlversuche. Benutze deine Passphrase."
     override val gestureFallbackLocked = "Die Gesten-Entsperrung ist abgeschaltet. Benutze deine Passphrase."

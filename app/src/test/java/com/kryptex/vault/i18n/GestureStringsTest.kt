@@ -57,10 +57,17 @@ class GestureStringsTest {
         add(s.gestureMessage(GestureMessage.Mismatch))
         add(s.gestureMessage(GestureMessage.SaveFailed("x")))
         listOf(null, 0, 1, 3).forEach { add(s.gestureMessage(GestureMessage.Wrong(it))) }
+        add(s.gestureMessage(GestureMessage.FaceInconsistent))
         FailureReason.entries.forEach { add(s.gestureMessage(GestureMessage.Failure(it))) }
         GestureFallback.entries.forEach { add(s.gestureFallback(it)) }
         add(s.showPassphrase)
         add(s.hidePassphrase)
+        add(s.settingsHapticTitle)
+        add(s.settingsHapticBody)
+        add(s.settingsFaceCheckTitle)
+        add(s.settingsFaceCheckBody)
+        add(s.onboardingGestureBody)
+        add(s.onboardingConvenienceBody)
     }
 
     @Test
@@ -115,6 +122,24 @@ class GestureStringsTest {
     @Test
     fun shortWarningDiffersFromPlainTitle() {
         for (s in all) assertNotEquals(s.gestureEntropyTitle(20, short = true), s.gestureEntropyTitle(20, short = false))
+    }
+
+    @Test
+    fun theFaceReadingMessageIsNotMistakenForAnyOtherMessage() {
+        for (s in all) {
+            val faceMessage = s.gestureMessage(GestureMessage.FaceInconsistent)
+            val others = listOf(GestureMessage.Mismatch, GestureMessage.Recorded, GestureMessage.Wrong(null)).map(s::gestureMessage)
+            assertTrue("collides with another message in ${s.locale}", faceMessage !in others)
+        }
+    }
+
+    @Test
+    fun theFaceCheckIsDescribedHonestlyInEveryLanguage() {
+        // The privacy copy must no longer claim that nothing is kept: face proportions are saved (encrypted) at setup.
+        val oldClaims = listOf("nothing is recorded or stored", "nichts wird aufgezeichnet oder gespeichert", "ничего не записывается и не сохраняется")
+        for (s in all) {
+            for (old in oldClaims) assertTrue("${s.locale} still says '$old'", old !in s.gesturePrivacyNote)
+        }
     }
 
     @Test

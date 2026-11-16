@@ -231,6 +231,10 @@ interface AppStrings {
     val settingsLanguageHint: String
     val settingsHelpTitle: String
     val settingsHelpBody: String
+    val settingsHapticTitle: String
+    val settingsHapticBody: String
+    val settingsFaceCheckTitle: String
+    val settingsFaceCheckBody: String
     val settingsAutoLockTitle: String
     val settingsAutoLockHint: String
     fun autoLockLabel(seconds: Int): String
@@ -325,6 +329,7 @@ interface AppStrings {
     val gestureMsgMismatch: String
     fun gestureMsgSaveFailed(detail: String): String
     fun gestureMsgWrong(attemptsLeft: Int?): String
+    val gestureMsgFaceInconsistent: String
 
     val gestureFallbackDbOpen: String
     val gestureFallbackTooManyAttempts: String
@@ -354,6 +359,7 @@ interface AppStrings {
         GestureMessage.Mismatch -> gestureMsgMismatch
         is GestureMessage.SaveFailed -> gestureMsgSaveFailed(message.detail)
         is GestureMessage.Wrong -> gestureMsgWrong(message.attemptsLeft)
+        GestureMessage.FaceInconsistent -> gestureMsgFaceInconsistent
         is GestureMessage.Failure -> gestureFailure(message.reason)
     }
 

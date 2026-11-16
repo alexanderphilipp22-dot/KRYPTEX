@@ -34,7 +34,11 @@ sealed interface GlanceState {
         val totalSeconds: Int,
     ) : GlanceState
 
-    data class Completed(val sequence: GestureSequence) : GlanceState
+    /**
+     * @param face the proportions of the face the session saw, for the optional face check; null if
+     *   too few calm frames were measured. Whoever consumes the state owns it and wipes it.
+     */
+    data class Completed(val sequence: GestureSequence, val face: FaceDescriptor? = null) : GlanceState
 
     data class Failed(val reason: FailureReason) : GlanceState
 }

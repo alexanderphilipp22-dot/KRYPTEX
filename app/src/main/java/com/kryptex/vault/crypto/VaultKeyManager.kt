@@ -11,6 +11,12 @@ sealed interface UnlockResult {
     /** @param attemptsRemaining only set for gestures: tries left before the gesture slot locks. */
     data class WrongCredential(val attemptsRemaining: Int? = null) : UnlockResult
 
+    /**
+     * The gesture sequence was right but the face check did not accept the face. Counted like a
+     * wrong sequence: it uses up one of the attempts.
+     */
+    data class FaceMismatch(val attemptsRemaining: Int) : UnlockResult
+
     /** Too many failed gestures; unlock with the passphrase to re-enable. */
     data object GestureLocked : UnlockResult
 
@@ -45,11 +51,18 @@ data class SecuritySummary(
  * Owns the key hierarchy:
  * ```
  * passphrase --Argon2id--> KEK_p --AES-GCM--> DEK
- * gesture    --Argon2id--> K_g --AES-GCM--> (Keystore wrap) --> DEK
+ * gesture    --Argon2id--> K_g --AES-GCM--> (Keystore wrap) --> DEK [|| face template]
  * ```
  * The DEK (32 random bytes) is created once, never stored in the clear, and is the root of the
  * SQLCipher key. Every method that runs Argon2id blocks for about a second - call from a
  * background dispatcher.
+ *
+ * **Face template.** A gesture slot made with the face check carries an opaque template (bytes
+ * this class never interprets) after the DEK inside the same encrypted payload. It is therefore
+ * readable only with the right sequence, on this device, and it is compared *before* the DEK is
+ * handed out. It cannot live in the database: that is encrypted with a key derived from the DEK,
+ * so it is locked exactly when the face has to be checked. Slots made before the face check hold
+ * the DEK alone and simply have no face check.
  */
 class VaultKeyManager(
     private val headerStore: VaultHeaderStore,
@@ -140,9 +153,17 @@ class VaultKeyManager(
         return UnlockResult.Success(dek)
     }
 
-    /** [gestureSecret] is the canonical byte encoding of the gesture sequence (see the vision package). */
+    /**
+     * [gestureSecret] is the canonical byte encoding of the gesture sequence (see the vision package).
+     *
+     * @param faceCheck decides whether the face seen just now fits the stored template, which it is
+     *   handed (and which this method wipes afterwards). Null = do not check. It is only called
+     *   when the sequence was right and the slot has a template; if it returns false or throws, the
+     *   result is [UnlockResult.FaceMismatch] and the key never leaves this method. It runs inside
+     *   the key manager's lock, so keep it quick and free of blocking work.
+     */
     @Synchronized
-    fun unlockWithGesture(gestureSecret: ByteArray): UnlockResult {
+    fun unlockWithGesture(gestureSecret: ByteArray, faceCheck: ((ByteArray) -> Boolean)? = null): UnlockResult {
         val header = when (val read = readHeader()) {
             is HeaderRead.Ok -> read.header
             HeaderRead.Missing -> return UnlockResult.NoVault
@@ -167,28 +188,74 @@ class VaultKeyManager(
             inner.wipe()
             throw t
         }
-        val dek = try {
+        val opened = try {
             AesGcm.openOrNull(kg, inner, aad)
         } finally {
             kg.wipe()
             inner.wipe()
         } ?: return UnlockResult.WrongCredential(limiter.remaining(afterIncrement))
 
+        // The payload is the DEK, then (for slots made with the face check) the face template.
+        if (opened.size < DEK_BYTES) {
+            opened.wipe()
+            return UnlockResult.Corrupt
+        }
+        val dek = opened.copyOfRange(0, DEK_BYTES)
+        val template = if (opened.size > DEK_BYTES) opened.copyOfRange(DEK_BYTES, opened.size) else null
+        opened.wipe()
+
+        val faceAccepted = try {
+            template == null || faceCheck == null || runFaceCheck(faceCheck, template)
+        } finally {
+            template?.wipe()
+        }
+        if (!faceAccepted) {
+            // The sequence was right, so this attempt stays counted: a copied sequence gets five tries, not unlimited ones.
+            dek.wipe()
+            return UnlockResult.FaceMismatch(limiter.remaining(afterIncrement))
+        }
+
         limiter.reset()
         return UnlockResult.Success(dek)
     }
 
-    /** Adds or replaces the gesture slot. Needs the DEK, so the vault must be unlocked. */
+    /** A check that throws is a check that failed: nobody gets in on an error. */
+    private fun runFaceCheck(check: (ByteArray) -> Boolean, template: ByteArray): Boolean =
+        try {
+            check(template)
+        } catch (_: Exception) {
+            false
+        }
+
+    /**
+     * Adds or replaces the gesture slot. Needs the DEK, so the vault must be unlocked.
+     *
+     * @param faceTemplate opaque bytes to be handed to the face check at unlock, or null for a slot
+     *   without one. At most [MAX_FACE_TEMPLATE_BYTES]. It is sealed together with the DEK and
+     *   never stored in the clear; the caller keeps ownership of the array and wipes it.
+     */
     @Synchronized
-    fun enrollGesture(dek: ByteArray, gestureSecret: ByteArray, steps: Int, params: Argon2Params) {
+    fun enrollGesture(
+        dek: ByteArray,
+        gestureSecret: ByteArray,
+        steps: Int,
+        params: Argon2Params,
+        faceTemplate: ByteArray? = null,
+    ) {
         require(steps in MIN_GESTURE_STEPS..MAX_GESTURE_STEPS) { "gesture length out of range" }
+        require(faceTemplate == null || faceTemplate.size in 1..MAX_FACE_TEMPLATE_BYTES) { "face template size out of range" }
         val header = requireHeader()
         val salt = randomBytes(SALT_BYTES)
         val kg = kdf.derive(gestureSecret, salt, params)
         try {
             val draft = GestureSlot(steps, params, salt, ByteArray(0))
             val aad = gestureAad(draft)
-            val inner = AesGcm.seal(kg, dek, aad, random)
+            val payload = if (faceTemplate == null) dek else dek + faceTemplate
+            val inner = try {
+                AesGcm.seal(kg, payload, aad, random)
+            } finally {
+                if (payload !== dek) payload.wipe()
+            }
             val wrapped = try {
                 deviceKey.wrap(inner, aad)
             } finally {
@@ -290,6 +357,9 @@ class VaultKeyManager(
         const val SALT_BYTES = 16
         const val MIN_GESTURE_STEPS = 3
         const val MAX_GESTURE_STEPS = 12
+
+        /** Far above what the face check stores, far below the header's limit for a wrapped key. */
+        const val MAX_FACE_TEMPLATE_BYTES = 64
 
         private val AAD_PREFIX = "KRX1".toByteArray(Charsets.US_ASCII)
         private const val SLOT_PASSPHRASE: Byte = 1

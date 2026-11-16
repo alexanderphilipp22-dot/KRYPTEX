@@ -49,6 +49,16 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
 
     val showHelpBubbles: StateFlow<Boolean> = container.showHelpBubbles
 
+    /** Whether a recognised gesture gives a short vibration pulse. Stored locally, not in the vault. */
+    val hapticFeedback: StateFlow<Boolean> = container.haptics.enabled
+
+    fun setHapticFeedback(on: Boolean) = container.haptics.setEnabled(on)
+
+    /** Whether gesture unlock also compares the face with the one saved at setup. Stored locally, not in the vault. */
+    val faceCheck: StateFlow<Boolean> = container.faceCheck.enabled
+
+    fun setFaceCheck(on: Boolean) = container.faceCheck.setEnabled(on)
+
     private val mutableSecurity = MutableStateFlow(container.keyManager.securitySummary())
     val security: StateFlow<SecuritySummary?> = mutableSecurity.asStateFlow()
 

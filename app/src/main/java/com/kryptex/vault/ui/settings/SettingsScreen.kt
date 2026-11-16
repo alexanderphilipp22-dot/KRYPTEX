@@ -81,6 +81,8 @@ fun SettingsScreen(onSetUpGesture: () -> Unit, contentPadding: PaddingValues) {
     val security by viewModel.security.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
     val showHelp by viewModel.showHelpBubbles.collectAsStateWithLifecycle()
+    val haptic by viewModel.hapticFeedback.collectAsStateWithLifecycle()
+    val faceCheck by viewModel.faceCheck.collectAsStateWithLifecycle()
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
 
@@ -111,6 +113,7 @@ fun SettingsScreen(onSetUpGesture: () -> Unit, contentPadding: PaddingValues) {
 
             LanguageSection(strings, language, onSelect = viewModel::setLanguage)
             HelpSection(strings, showHelp, onChange = viewModel::setShowHelpBubbles)
+            HapticSection(strings, haptic, onChange = viewModel::setHapticFeedback)
             AutoLockSection(strings, autoLock, onSelect = viewModel::setAutoLock)
             FolderSection(strings, folder, onSave = viewModel::setSaveFolder)
             UnlockSection(
@@ -120,6 +123,7 @@ fun SettingsScreen(onSetUpGesture: () -> Unit, contentPadding: PaddingValues) {
                 onSetUpGesture = onSetUpGesture,
                 onRemoveGesture = { dialog = SettingsDialog.REMOVE_GESTURE },
             )
+            FaceCheckSection(strings, faceCheck, onChange = viewModel::setFaceCheck)
             MemorySection(strings, onLock = viewModel::lockAndClearMemory)
             AlwaysOnSection(strings)
             DangerSection(strings, onErase = { viewModel.clearDialogError(); dialog = SettingsDialog.ERASE })
@@ -179,7 +183,20 @@ private fun LanguageSection(strings: AppStrings, current: AppLanguage, onSelect:
 }
 
 @Composable
-private fun HelpSection(strings: AppStrings, enabled: Boolean, onChange: (Boolean) -> Unit) {
+private fun HelpSection(strings: AppStrings, enabled: Boolean, onChange: (Boolean) -> Unit) =
+    ToggleSection(strings.settingsHelpTitle, strings.settingsHelpBody, enabled, onChange)
+
+@Composable
+private fun HapticSection(strings: AppStrings, enabled: Boolean, onChange: (Boolean) -> Unit) =
+    ToggleSection(strings.settingsHapticTitle, strings.settingsHapticBody, enabled, onChange)
+
+@Composable
+private fun FaceCheckSection(strings: AppStrings, enabled: Boolean, onChange: (Boolean) -> Unit) =
+    ToggleSection(strings.settingsFaceCheckTitle, strings.settingsFaceCheckBody, enabled, onChange)
+
+/** A whole-row switch card: the title and hint wrap in the space the switch leaves. */
+@Composable
+private fun ToggleSection(title: String, body: String, enabled: Boolean, onChange: (Boolean) -> Unit) {
     Card(Modifier.fillMaxWidth(), colors = graphiteCardColors(), border = hairline()) {
         Row(
             Modifier.fillMaxWidth()
@@ -189,8 +206,8 @@ private fun HelpSection(strings: AppStrings, enabled: Boolean, onChange: (Boolea
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(strings.settingsHelpTitle, style = MaterialTheme.typography.titleMedium)
-                Hint(strings.settingsHelpBody)
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Hint(body)
             }
             Switch(checked = enabled, onCheckedChange = null)
         }

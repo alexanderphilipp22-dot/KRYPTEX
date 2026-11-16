@@ -206,6 +206,169 @@ class VaultKeyManagerTest {
         }
     }
 
+    // ---- face template in the gesture slot -------------------------------------------------
+
+    private val faceTemplate get() = ByteArray(42) { (it * 3 + 11).toByte() }
+
+    private fun enrolWithFace(): ByteArray {
+        val dek = manager.createVault(passphrase, params)
+        manager.enrollGesture(dek, gesture, 6, params, faceTemplate)
+        return dek
+    }
+
+    @Test
+    fun aMatchingFaceUnlocksAndTheCheckSeesTheStoredTemplate() {
+        val dek = enrolWithFace()
+        var seen: ByteArray? = null
+
+        val result = manager.unlockWithGesture(gesture) { template -> seen = template.copyOf(); true }
+
+        assertArrayEquals(dek, success(result))
+        assertArrayEquals(faceTemplate, seen)
+        assertEquals(0, store.read()!!.failedGestureAttempts)
+    }
+
+    @Test
+    fun theKeyIsExactlyTheDekEvenWhenATemplateRidesAlong() {
+        val dek = enrolWithFace()
+        assertEquals(VaultKeyManager.DEK_BYTES, success(manager.unlockWithGesture(gesture) { true }).size)
+        // ...and the passphrase path is untouched by the template.
+        assertArrayEquals(dek, success(manager.unlockWithPassphrase(passphrase)))
+    }
+
+    @Test
+    fun aMismatchedFaceIsRefusedAndCountsAsAnAttempt() {
+        enrolWithFace()
+
+        assertEquals(UnlockResult.FaceMismatch(4), manager.unlockWithGesture(gesture) { false })
+        assertEquals(1, store.read()!!.failedGestureAttempts)
+        assertEquals(UnlockResult.FaceMismatch(3), manager.unlockWithGesture(gesture) { false })
+    }
+
+    @Test
+    fun fiveMismatchesLockTheGestureSlotEvenWithTheRightSequence() {
+        enrolWithFace()
+
+        for (expectedRemaining in 4 downTo 0) {
+            assertEquals(UnlockResult.FaceMismatch(expectedRemaining), manager.unlockWithGesture(gesture) { false })
+        }
+        assertEquals(GestureSlotInfo.Locked, manager.gestureSlotInfo())
+        assertEquals(UnlockResult.GestureLocked, manager.unlockWithGesture(gesture) { true })
+    }
+
+    @Test
+    fun aMatchAfterAMismatchResetsTheCounter() {
+        val dek = enrolWithFace()
+        manager.unlockWithGesture(gesture) { false }
+        manager.unlockWithGesture(gesture) { false }
+        assertEquals(2, store.read()!!.failedGestureAttempts)
+
+        assertArrayEquals(dek, success(manager.unlockWithGesture(gesture) { true }))
+        assertEquals(0, store.read()!!.failedGestureAttempts)
+    }
+
+    @Test
+    fun aFaceCheckThatThrowsFailsClosed() {
+        enrolWithFace()
+        val result = manager.unlockWithGesture(gesture) { error("vision layer exploded") }
+        assertEquals(UnlockResult.FaceMismatch(4), result)
+    }
+
+    @Test
+    fun aWrongSequenceIsStillAWrongSequenceAndNeverReachesTheFaceCheck() {
+        enrolWithFace()
+        var calls = 0
+
+        val result = manager.unlockWithGesture(byteArrayOf(9, 9, 9, 9, 9, 9)) { calls++; true }
+
+        assertEquals(UnlockResult.WrongCredential(4), result)
+        assertEquals("the template is only unsealed by the right sequence", 0, calls)
+    }
+
+    @Test
+    fun withoutACheckTheTemplateIsIgnored() {
+        val dek = enrolWithFace()
+        assertArrayEquals(dek, success(manager.unlockWithGesture(gesture)))
+        assertArrayEquals(dek, success(manager.unlockWithGesture(gesture, faceCheck = null)))
+    }
+
+    @Test
+    fun aSlotWithoutATemplateHasNothingToCheckAndSimplyUnlocks() {
+        val dek = manager.createVault(passphrase, params)
+        manager.enrollGesture(dek, gesture, 6, params) // as slots made before the face check
+        var calls = 0
+
+        val result = manager.unlockWithGesture(gesture) { calls++; false }
+
+        assertArrayEquals(dek, success(result))
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun enrollingAgainWithoutATemplateDropsTheOldOne() {
+        val dek = enrolWithFace()
+        manager.enrollGesture(dek, gesture, 6, params)
+
+        assertArrayEquals(dek, success(manager.unlockWithGesture(gesture) { false }))
+    }
+
+    @Test
+    fun enrollingAgainWithANewTemplateReplacesTheOldOne() {
+        val dek = enrolWithFace()
+        val replacement = ByteArray(42) { (it + 100).toByte() }
+        manager.enrollGesture(dek, gesture, 6, params, replacement)
+        var seen: ByteArray? = null
+
+        manager.unlockWithGesture(gesture) { template -> seen = template.copyOf(); true }.also { success(it).wipe() }
+
+        assertArrayEquals(replacement, seen)
+    }
+
+    @Test
+    fun theTemplateIsNeverInTheHeaderInTheClear() {
+        enrolWithFace()
+        val bytes = File(dir, VaultHeaderStore.DEFAULT_NAME).readBytes()
+        assertFalse(bytes.toHex().contains(faceTemplate.toHex()))
+        // Not even a recognisable run of it, as a partial leak would reveal:
+        assertFalse(bytes.toHex().contains(faceTemplate.copyOfRange(0, 12).toHex()))
+    }
+
+    @Test
+    fun theTemplateCannotBeReadWithoutTheRightSequence() {
+        enrolWithFace()
+        var calls = 0
+        repeat(3) { manager.unlockWithGesture(byteArrayOf(1, 1, 1, 1, 1, it.toByte())) { calls++; true } }
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun enrolRejectsEmptyAndOversizedTemplates() {
+        val dek = manager.createVault(passphrase, params)
+        for (size in listOf(0, VaultKeyManager.MAX_FACE_TEMPLATE_BYTES + 1)) {
+            try {
+                manager.enrollGesture(dek, gesture, 6, params, ByteArray(size))
+                error("template of $size bytes must be rejected")
+            } catch (_: IllegalArgumentException) {
+                // expected
+            }
+        }
+        assertEquals(GestureSlotInfo.NotEnrolled, manager.gestureSlotInfo())
+    }
+
+    @Test
+    fun theLargestAllowedTemplateStillFitsTheHeader() {
+        val dek = manager.createVault(passphrase, params)
+        manager.enrollGesture(dek, gesture, 6, params, ByteArray(VaultKeyManager.MAX_FACE_TEMPLATE_BYTES) { 7 })
+        assertArrayEquals(dek, success(manager.unlockWithGesture(gesture) { true }))
+    }
+
+    @Test
+    fun changingThePassphraseKeepsTheFaceCheckWorking() {
+        val dek = enrolWithFace()
+        manager.changePassphrase(dek, "a brand new passphrase".toCharArray(), params)
+        assertEquals(UnlockResult.FaceMismatch(4), manager.unlockWithGesture(gesture) { false })
+    }
+
     // ---- passphrase change / wipe ----------------------------------------------------------
 
     @Test

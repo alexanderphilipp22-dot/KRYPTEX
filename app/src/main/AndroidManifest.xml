@@ -2,8 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- The only permission Kryptex ever asks for. Camera is used on explicit user tap only. -->
+    <!-- Camera is used on explicit user tap only. -->
     <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- The short pulse when a gesture is recognised. A normal permission: granted at install, never prompts. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Zero-network: make sure no library can merge these in. Enforced again by verifyManifestPermissions*. -->
     <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />

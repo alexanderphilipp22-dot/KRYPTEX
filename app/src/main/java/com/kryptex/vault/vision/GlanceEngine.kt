@@ -198,11 +198,14 @@ class GlanceEngine(
     private fun onFrame(s: Session, frame: FaceFrame) {
         val snapshot: DetectorSnapshot
         val sequence: GestureSequence?
+        val face: FaceDescriptor?
         synchronized(lock) {
             if (session !== s) return
             s.lastFrameAt = uptimeMillis()
             snapshot = s.detector.onFrame(frame)
             sequence = s.detector.sequenceOrNull()
+            // Read now: release() wipes the detector's samples. Only a finished session has a face.
+            face = if (snapshot.phase == DetectorPhase.COMPLETE) s.detector.faceDescriptor() else null
         }
 
         when (snapshot.phase) {
@@ -225,7 +228,7 @@ class GlanceEngine(
                     ),
                 )
 
-            DetectorPhase.COMPLETE -> finish(s, GlanceState.Completed(checkNotNull(sequence)))
+            DetectorPhase.COMPLETE -> finish(s, GlanceState.Completed(checkNotNull(sequence), face))
             DetectorPhase.FAILED -> finish(s, GlanceState.Failed(snapshot.failure ?: FailureReason.TIMEOUT))
         }
     }

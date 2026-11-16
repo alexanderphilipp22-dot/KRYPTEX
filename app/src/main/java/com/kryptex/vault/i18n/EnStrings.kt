@@ -85,10 +85,10 @@ object EnStrings : AppStrings {
     override val onboardingTuning = "Your device is tuning the key derivation to its own speed. This takes a few seconds."
     override val onboardingGestureTitle = "Quick unlock with your face"
     override val onboardingGestureBody =
-        "Unlock by performing a secret sequence of blinks, glances, eyebrow raises or smiles instead of typing. The camera only starts when you tap the button, and nothing is recorded."
+        "Unlock by performing a secret sequence of blinks, glances, eyebrow raises or smiles instead of typing. The camera only starts when you tap the button, and no picture is recorded. A few proportions of your face are saved, encrypted, on this phone, so that someone who copies your sequence is turned away."
     override val onboardingConvenienceTitle = "A convenience, not a replacement"
     override val onboardingConvenienceBody =
-        "A gesture sequence is a secret you perform, not a biometric check. Anyone who watches you can learn it, and it is far weaker than a passphrase. Your passphrase always works."
+        "A gesture sequence is a secret you perform. Anyone who watches you can learn it, and the face check on top is only rough: it turns away clearly different faces, not look-alikes. Gestures are far weaker than a passphrase. Your passphrase always works."
     override val onboardingSetUpGestures = "Set up gesture unlock"
     override val onboardingNotNow = "Not now"
     override fun onboardingCreateFailed(detail: String) = "The vault could not be created: $detail"
@@ -255,6 +255,11 @@ object EnStrings : AppStrings {
     override val settingsLanguageHint = "Saved in your encrypted vault. Before you unlock, the lock screen follows your phone's language."
     override val settingsHelpTitle = "Help bubbles"
     override val settingsHelpBody = "Show short tips on the Hide, Reveal and Settings screens."
+    override val settingsHapticTitle = "Gesture vibration"
+    override val settingsHapticBody = "A short pulse each time a gesture of your sequence is recognised, so you know when to do the next one."
+    override val settingsFaceCheckTitle = "Face check"
+    override val settingsFaceCheckBody =
+        "Gesture unlock also compares your face proportions with the ones saved, encrypted, when you set gestures up, so someone who copies your sequence is turned away. It is a rough check: look-alikes may pass, and poor light may turn you away. Gestures set up with an older version have no saved face; set them up again."
     override val settingsAutoLockTitle = "Auto-lock"
     override val settingsAutoLockHint =
         "The vault always locks the moment you leave the app or the screen turns off. This adds a timer for when you stop touching the screen while Kryptex stays open."
@@ -342,7 +347,8 @@ object EnStrings : AppStrings {
     override val gestureCameraOff = "Camera is off"
     override val gestureChecking = "Checking..."
     override val gestureStartCamera = "Start camera"
-    override val gesturePrivacyNote = "The camera is off until you tap the button, and nothing is recorded or stored."
+    override val gesturePrivacyNote =
+        "The camera is off until you tap the button. No picture is recorded or stored; only a few face proportions are measured, and setting gestures up saves them, encrypted, on this phone."
     override val gestureHeadlineUnlock = "Perform your sequence"
     override val gestureHeadlineSaving = "Saving..."
     override val gestureHeadlineRecord = "Record your sequence"
@@ -391,6 +397,8 @@ object EnStrings : AppStrings {
         1 -> "That was not it. One attempt left before gesture unlock switches off."
         else -> "That was not it. $attemptsLeft attempts left before gesture unlock switches off."
     }
+    override val gestureMsgFaceInconsistent =
+        "Your face was not read clearly both times. Hold the phone at eye level in good light, face the camera and start again."
     override val gestureFallbackDbOpen = "The vault database could not be opened."
     override val gestureFallbackTooManyAttempts = "Too many failed attempts. Use your passphrase."
     override val gestureFallbackLocked = "Gesture unlock is switched off. Use your passphrase."

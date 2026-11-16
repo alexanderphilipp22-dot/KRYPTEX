@@ -22,6 +22,8 @@ import com.kryptex.vault.i18n.AppLanguage
 import com.kryptex.vault.i18n.AppStrings
 import com.kryptex.vault.stego.StegoEngine
 import com.kryptex.vault.ui.AutoLock
+import com.kryptex.vault.ui.FaceCheck
+import com.kryptex.vault.ui.Haptics
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -114,10 +116,18 @@ class AppContainer(private val application: Application) {
             databaseFactory
             sessionManager
         }
+        step { haptics } // reads its preference file here, not on the main thread
+        step { faceCheck }
         step { DatabaseFactory.loadNativeLibrary() } // SQLCipher: loaded here so unlock never pays for it
         step { keyManager.vaultExists() } // builds the key manager: Argon2 (native) and the Keystore wrapper
         return StartupState.Ready(vaultExists = exists, degradedReason = problem)
     }
+
+    /** Gesture vibration and its on/off switch. A plain preference: it is needed while the vault is locked. */
+    val haptics: Haptics by lazy { Haptics(application) }
+
+    /** The switch for the face check at gesture unlock; a plain preference for the same reason. */
+    val faceCheck: FaceCheck by lazy { FaceCheck(application) }
 
     val headerStore: VaultHeaderStore by lazy { VaultHeaderStore(application.filesDir) }
     val argon2: Argon2Kdf by lazy { Argon2ktKdf() }

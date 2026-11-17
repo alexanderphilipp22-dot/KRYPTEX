@@ -1,0 +1,28 @@
+name: Claude Issue Responder
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  claude-reply:
+    if: github.event.issue.user.login != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Claude Code Action
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Du bist der leitende Maintainer des Open-Source-Projekts Kryptex (einem offline, Zero-Trust Android-Tresor mit Jetpack Compose, SQLCipher, Argon2id und MediaPipe-Blickerkennung).
+            Antworte sachlich, direkt, technisch präzise und hilfsbereit auf das aktuelle Issue oder den Kommentar. 
+            Halte dich kurz und prägnant. Keine unnötigen Floskeln.
